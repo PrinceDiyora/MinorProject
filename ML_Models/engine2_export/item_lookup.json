@@ -1,0 +1,137 @@
+{
+  "Panipuri": {
+    "cat": "Street Food",
+    "cost": 8,
+    "price": 20
+  },
+  "Vadapav": {
+    "cat": "Street Food",
+    "cost": 10,
+    "price": 25
+  },
+  "Samosa": {
+    "cat": "Street Food",
+    "cost": 10,
+    "price": 20
+  },
+  "Dabeli": {
+    "cat": "Street Food",
+    "cost": 12,
+    "price": 30
+  },
+  "Bhel Puri": {
+    "cat": "Street Food",
+    "cost": 15,
+    "price": 40
+  },
+  "Sev Puri": {
+    "cat": "Street Food",
+    "cost": 14,
+    "price": 35
+  },
+  "Burger": {
+    "cat": "Fast Food",
+    "cost": 45,
+    "price": 120
+  },
+  "Pizza": {
+    "cat": "Fast Food",
+    "cost": 85,
+    "price": 250
+  },
+  "Sandwich": {
+    "cat": "Fast Food",
+    "cost": 30,
+    "price": 80
+  },
+  "Frankie": {
+    "cat": "Fast Food",
+    "cost": 35,
+    "price": 90
+  },
+  "Fries": {
+    "cat": "Fast Food",
+    "cost": 20,
+    "price": 80
+  },
+  "Garlic Bread": {
+    "cat": "Fast Food",
+    "cost": 25,
+    "price": 90
+  },
+  "Paneer Butter Masala": {
+    "cat": "Traditional",
+    "cost": 70,
+    "price": 200
+  },
+  "Dal Makhani": {
+    "cat": "Traditional",
+    "cost": 40,
+    "price": 130
+  },
+  "Veg Thali": {
+    "cat": "Traditional",
+    "cost": 80,
+    "price": 220
+  },
+  "Chole Bhature": {
+    "cat": "Traditional",
+    "cost": 35,
+    "price": 110
+  },
+  "Roti": {
+    "cat": "Traditional",
+    "cost": 5,
+    "price": 15
+  },
+  "Rajma Chawal": {
+    "cat": "Traditional",
+    "cost": 45,
+    "price": 140
+  },
+  "Cold Coffee": {
+    "cat": "Beverage",
+    "cost": 15,
+    "price": 70
+  },
+  "Chai": {
+    "cat": "Beverage",
+    "cost": 5,
+    "price": 20
+  },
+  "Thick Shake": {
+    "cat": "Beverage",
+    "cost": 30,
+    "price": 120
+  },
+  "Lassi": {
+    "cat": "Beverage",
+    "cost": 18,
+    "price": 60
+  },
+  "Lemon Soda": {
+    "cat": "Beverage",
+    "cost": 8,
+    "price": 35
+  },
+  "Gulab Jamun": {
+    "cat": "Dessert",
+    "cost": 20,
+    "price": 60
+  },
+  "Kulfi": {
+    "cat": "Dessert",
+    "cost": 25,
+    "price": 80
+  },
+  "Ice Cream": {
+    "cat": "Dessert",
+    "cost": 20,
+    "price": 70
+  },
+  "Kheer": {
+    "cat": "Dessert",
+    "cost": 15,
+    "price": 50
+  }
+}

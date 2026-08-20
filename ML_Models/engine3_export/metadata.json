@@ -1,0 +1,134 @@
+{
+  "version": "3.0",
+  "trained_at": "2026-03-06T05:54:31.180350",
+  "device_used": "cuda",
+  "leakage_fixes": [
+    "two_phase_train_all_3_models",
+    "causal_rolling_stats_shift1",
+    "item_avg_stats_from_training_only",
+    "popularity_pct_within_day_window",
+    "quadrant_thresholds_from_training_only"
+  ],
+  "features": [
+    "item_name_enc",
+    "item_category_enc",
+    "item_avg_margin",
+    "item_avg_popularity",
+    "margin_x_popularity",
+    "quadrant",
+    "is_star",
+    "is_puzzle",
+    "is_dog",
+    "is_plowhorse",
+    "margin_pct",
+    "gross_margin",
+    "cost_ratio",
+    "margin_headroom",
+    "popularity_pct",
+    "rolling_7d_qty",
+    "popularity_momentum",
+    "quantity_sold",
+    "base_cost",
+    "base_price",
+    "price_vs_cost_ratio",
+    "competitor_price_idx",
+    "comp_premium",
+    "comp_above_us",
+    "comp_below_us",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "month_sin",
+    "month_cos",
+    "is_weekend",
+    "is_lunch_peak",
+    "is_dinner_peak",
+    "is_late_night",
+    "is_payday_week"
+  ],
+  "q_names": {
+    "0": "Stars",
+    "1": "Puzzles",
+    "2": "Dogs",
+    "3": "Plowhorses"
+  },
+  "matrix": {
+    "quadrants": {
+      "0": "Stars",
+      "1": "Puzzles",
+      "2": "Dogs",
+      "3": "Plowhorses"
+    },
+    "quadrant_descriptions": {
+      "0": "High margin, low popularity \u2192 push with discounts/promotion",
+      "1": "High margin, high popularity \u2192 premium candidate",
+      "2": "Low margin, low popularity \u2192 consider removal or price increase",
+      "3": "Low margin, high popularity \u2192 raise price (price inelastic demand)"
+    },
+    "margin_median": 0.6666666666666666,
+    "pop_median": 0.5010649579777731,
+    "train_end_date": "2025-10-19",
+    "change_threshold_pct": 1.0,
+    "max_change_pct": 30.0
+  },
+  "thresholds": {
+    "stage_A": 0.3,
+    "stage_B": 0.3
+  },
+  "best_iterations": {
+    "A": 118,
+    "B": 30,
+    "C": 1
+  },
+  "metrics": {
+    "A_test_auc": 0.8214,
+    "A_test_f1": 0.9371,
+    "B_test_auc": 0.9084,
+    "B_test_f1": 0.9541,
+    "C_test_mae": 15.6821,
+    "C_test_r2": -3.1133
+  },
+  "item_classes": [
+    "Bhel Puri",
+    "Burger",
+    "Chai",
+    "Chole Bhature",
+    "Cold Coffee",
+    "Dabeli",
+    "Dal Makhani",
+    "Frankie",
+    "Fries",
+    "Garlic Bread",
+    "Gulab Jamun",
+    "Ice Cream",
+    "Kheer",
+    "Kulfi",
+    "Lassi",
+    "Lemon Soda",
+    "Paneer Butter Masala",
+    "Panipuri",
+    "Pizza",
+    "Rajma Chawal",
+    "Roti",
+    "Samosa",
+    "Sandwich",
+    "Sev Puri",
+    "Thick Shake",
+    "Vadapav",
+    "Veg Thali"
+  ],
+  "cat_classes": [
+    "Beverage",
+    "Dessert",
+    "Fast Food",
+    "Street Food",
+    "Traditional"
+  ],
+  "schema_alignment": {
+    "price_history.old_price": "base_price at call time",
+    "price_history.new_price": "suggested_price from suggest_price_action()",
+    "price_history.reason": "quadrant + direction + magnitude_pct",
+    "food_items.selling_price": "apply suggested_price after manager approval"
+  }
+}

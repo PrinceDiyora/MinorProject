@@ -1,0 +1,35 @@
+{
+  "name": "node_backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "nodemon -r dotenv/config --experimental-json-modules src/index.js",
+    "dev": "nodemon -r dotenv/config --experimental-json-modules src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "db:init": "node src/db/init.js",
+    "db:create": "node src/db/init.js",
+    "db:migrate": "node src/db/migrate.js",
+    "admin:set-password": "node src/db/seed-admin-password.js",
+    "seed": "node src/seeds/index.js",
+    "seed:categories": "node src/seeds/categories.seed.js",
+    "seed:items": "node src/seeds/foodItems.seed.js",
+    "seed:customers": "node src/seeds/customers.seed.js",
+    "seed:orders": "node src/seeds/orders.seed.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "node-cron": "^3.0.3",
+    "nodemon": "^3.1.14",
+    "pg": "^8.20.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

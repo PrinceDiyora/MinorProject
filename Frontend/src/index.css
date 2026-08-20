@@ -1,0 +1,188 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Roboto:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+/* ─── Design Tokens ─── */
+:root {
+  --brand-red:    #C52031;
+  --navy:         #09161F;
+  --surface:      #F4F6F8;
+  --card:         #FFFFFF;
+  --success:      #4AB866;
+  --warning-bg:   #FCF7A5;
+  --ai-badge:     #6C63FF;
+  --hidden-star:  #F5A623;
+  --border:       #E2E6EA;
+  --text-primary: #09161F;
+  --text-muted:   #6B7280;
+  --text-light:   #9CA3AF;
+}
+
+/* ─── Reset ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: var(--surface);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Typography ─── */
+.serif { font-family: 'DM Serif Display', serif; }
+.mono  { font-family: 'Roboto Mono', monospace; }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+
+/* ─── Buttons ─── */
+.btn-primary {
+  background-color: var(--brand-red);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 700;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  transition: background-color 0.2s, transform 0.15s;
+  text-decoration: none;
+  min-height: 48px;
+}
+.btn-primary:hover { background-color: #a81a28; transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--navy);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Roboto', sans-serif;
+  font-weight: 500;
+  font-size: 0.875rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  transition: border-color 0.2s, background-color 0.2s;
+  text-decoration: none;
+  min-height: 48px;
+}
+.btn-outline:hover { border-color: var(--navy); background-color: rgba(9,22,31,0.04); }
+
+/* ─── Cards ─── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* ─── Section Labels (small caps perpooja style) ─── */
+.section-label {
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-red);
+}
+
+/* ─── Editorial Divider ─── */
+.editorial-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Badge Utilities ─── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-family: 'Roboto', sans-serif;
+}
+.badge-success  { background: #DCFCE7; color: #166534; }
+.badge-danger   { background: #FEE2E2; color: var(--brand-red); }
+.badge-star     { background: #FEF3C7; color: #92400E; }
+.badge-ai       { background: #EDE9FE; color: #5B21B6; }
+.badge-muted    { background: #F3F4F6; color: #4B5563; }
+
+/* ─── Animations ─── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.fade-up { animation: fadeUp 0.55s ease forwards; }
+.delay-1 { animation-delay: 0.05s; opacity: 0; }
+.delay-2 { animation-delay: 0.15s; opacity: 0; }
+.delay-3 { animation-delay: 0.25s; opacity: 0; }
+
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ─── Table Utilities ─── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border);
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr:hover { background: rgba(9,22,31,0.025); }
+
+/* ─── Sidebar nav active ─── */
+.nav-active {
+  color: var(--brand-red) !important;
+  border-left: 3px solid var(--brand-red);
+  background: rgba(197,32,49,0.06);
+}
+
+/* ─── Input styles ─── */
+.input-field {
+  width: 100%;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  font-family: 'Roboto', sans-serif;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.input-field:focus { border-color: var(--brand-red); }
+.input-field::placeholder { color: var(--text-light); }
