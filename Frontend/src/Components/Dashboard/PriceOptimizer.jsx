@@ -59,6 +59,7 @@ function ContextBar({ totalItems, suggestedCount }) {
 export default function PriceOptimizer() {
     const [suggestions, setSuggestions] = useState([]);
     const [totalItems, setTotalItems] = useState(0);
+    const [itemsWithOrders, setItemsWithOrders] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [applying, setApplying] = useState({});   // { [food_id]: bool }
@@ -74,6 +75,7 @@ export default function PriceOptimizer() {
             if (res?.data) {
                 setSuggestions(res.data.suggestions || []);
                 setTotalItems(res.data.total_items || 0);
+                setItemsWithOrders(res.data.items_with_orders || 0);
             }
         } catch (err) {
             const msg = err?.response?.data?.message || err.message || "Failed to load suggestions";
@@ -190,10 +192,12 @@ export default function PriceOptimizer() {
                     padding: "3rem 2rem", textAlign: "center"
                 }}>
                     <p style={{ fontWeight: 700, color: "var(--navy)", marginBottom: "0.5rem" }}>
-                        All prices are currently optimal
+                        {itemsWithOrders === 0 ? "No recent order signal available" : "All prices are currently optimal"}
                     </p>
                     <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
-                        Engine 3 found no items that would benefit from a price change based on current demand and margin data.
+                        {itemsWithOrders === 0
+                            ? "Engine 3 only suggests changes for items sold in the last 7 days. Create a few orders first, then refresh."
+                            : "Engine 3 found no items that would benefit from a price change based on current demand and margin data."}
                     </p>
                 </div>
             )}

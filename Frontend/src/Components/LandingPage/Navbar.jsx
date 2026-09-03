@@ -31,7 +31,7 @@ export default function Navbar() {
             </svg>
           </div>
           <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.125rem", color: "#09161F", letterSpacing: "-0.01em" }}>
-            RasoiAI
+            KitchenAI
           </span>
         </Link>
 

@@ -1,4 +1,4 @@
-# RasoiAI
+# KitchenAI
 
 An AI-powered restaurant management platform that combines real-time dynamic pricing, intelligent upsell recommendations, and a voice-based ordering agent. Built for multi-tenant restaurant operations with a focus on margin optimization and operational efficiency.
 

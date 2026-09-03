@@ -19,7 +19,7 @@ export default function FinalCTA() {
               Revenue intelligence,<br />automated.
             </h2>
             <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.9375rem", maxWidth: 460 }}>
-              Built for Petpooja Hackathon 2026. Two AI modules, one unified platform — from voice ordering to margin analysis.
+              Two AI modules, one unified platform — from voice ordering to margin analysis.
             </p>
           </div>
 

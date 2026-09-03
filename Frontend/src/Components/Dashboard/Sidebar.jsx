@@ -97,7 +97,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           </div>
           {!collapsed && (
             <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1rem", color: "#fff", letterSpacing: "-0.01em" }}>
-              RasoiAI
+              KitchenAI
             </span>
           )}
         </div>

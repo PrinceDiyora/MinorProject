@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 const FOOTER_LINKS = [
   { heading: "Product", links: ["Revenue Dashboard", "Menu Matrix", "Combo Engine", "Price Optimizer", "Voice Settings"] },
   { heading: "Platform", links: ["Architecture", "Data Privacy", "Security", "Integrations"] },
-  { heading: "Hackathon", links: ["Problem Statement", "Blueprint v3.0", "Build Checklist", "Judging Criteria"] },
+  // { heading: "Hackathon", links: ["Problem Statement", "Blueprint v3.0", "Build Checklist", "Judging Criteria"] },
 ];
 
 export default function Footer() {
@@ -19,10 +19,10 @@ export default function Footer() {
                   <path d="M3 3h18M3 9h18M3 15h10M3 21h10M17 15l3 3-3 3" />
                 </svg>
               </div>
-              <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1rem", color: "#fff" }}>RasoiAI</span>
+              <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1rem", color: "#fff" }}>KitchenAI</span>
             </div>
             <p style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.875rem", lineHeight: 1.65, maxWidth: 260 }}>
-              AI-powered revenue intelligence and voice ordering for modern restaurants. Built for the Petpooja Hackathon 2026.
+              AI-powered revenue intelligence and voice ordering for modern restaurants.
             </p>
           </div>
 
@@ -47,7 +47,7 @@ export default function Footer() {
 
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
           <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.8125rem" }}>
-            © 2026 RasoiAI. Petpooja Hackathon · Track: AI-Powered Revenue & Voice Copilot
+            © 2026 KitchenAI. · Track: AI-Powered Revenue & Voice Copilot
           </p>
           <div style={{ display: "flex", gap: "1.5rem" }}>
             <Link to="/login" style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.8125rem", textDecoration: "none" }}>Dashboard</Link>

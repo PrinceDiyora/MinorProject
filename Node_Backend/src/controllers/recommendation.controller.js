@@ -38,10 +38,10 @@ const recommend = asyncHandler(async (req, res) => {
     throw new ApiError(400, "cart contains no valid food_ids");
   }
 
-  threshold = threshold ? parseInt(threshold, 10) : 5;
+  threshold = threshold !== undefined ? parseInt(threshold, 10) : 5;
   limit     = limit     ? parseInt(limit,     10) : 3;
 
-  if (isNaN(threshold) || threshold < 1) threshold = 5;
+  if (isNaN(threshold) || threshold < 0) threshold = 5;
   if (isNaN(limit)     || limit     < 1) limit     = 3;
 
   // ── Run engine (adminId scopes results to this restaurant) ─────────────────

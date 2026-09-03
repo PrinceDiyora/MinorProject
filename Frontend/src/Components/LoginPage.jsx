@@ -41,7 +41,7 @@ export default function LoginPage() {
               <path d="M3 3h18M3 9h18M3 15h10M3 21h10M17 15l3 3-3 3" />
             </svg>
           </div>
-          <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.125rem", color: "#fff" }}>RasoiAI</span>
+          <span style={{ fontFamily: "'DM Serif Display', serif", fontSize: "1.125rem", color: "#fff" }}>KitchenAI</span>
         </Link>
 
         <div>
@@ -72,9 +72,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.8125rem" }}>
+        {/* <p style={{ color: "rgba(255,255,255,0.2)", fontSize: "0.8125rem" }}>
           Petpooja Hackathon 2026
-        </p>
+        </p> */}
       </div>
 
       {/* Right — Form */}
