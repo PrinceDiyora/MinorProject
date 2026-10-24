@@ -33,7 +33,8 @@ app.use(
   }),
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb", type: ["application/json", "text/plain", "application/*+json"] }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 
 // ── Routes ────────────────────────────────────────────────────────────────────

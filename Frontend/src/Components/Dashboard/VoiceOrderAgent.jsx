@@ -1,308 +1,391 @@
 /**
  * VoiceOrderAgent.jsx
  *
- * Voice ordering agent UI panel for the restaurant dashboard.
+ * Voice ordering agent UI — powered by Sarvam Conversational AI SDK.
  *
  * Flow:
- *  1. Admin clicks "Start Order" → opens WebSocket → greeting audio plays
- *  2. Audio ends → MediaRecorder auto-starts recording mic
- *  3. Admin clicks "Done Speaking" → sends audio → agent replies
- *  4. After reply audio ends → auto-record again (loop until call_ended)
- *  5. On call_ended → show order confirmation with order_id
- *
- * Requires:
- *  - VITE_VOICE_AGENT_WS_URL env var (default: ws://localhost:8001/ws/order-agent)
- *  - admin_id from AuthContext
+ *  1. Admin clicks "Start Order" → ConversationAgent.start() connects mic + WebSocket
+ *  2. Agent speaks greeting, listens, and responds via Sarvam AI
+ *  3. State badge updates in real-time (idle | connecting | connected | listening | speaking | error)
+ *  4. Admin can mute/unmute mic and view live speech transcripts
+ *  5. Admin clicks "End Call" → agent.stop()
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import {
+  ConversationAgent,
+  BrowserAudioInterface,
+  AgentState,
+  InteractionType,
+} from "sarvam-conv-ai-sdk/browser";
 import { useAuth } from "../../context/AuthContext";
 
-const WS_URL =
-  import.meta.env.VITE_VOICE_AGENT_WS_URL ||
-  "ws://localhost:8001/ws/order-agent";
-
-const STATUS = {
-  IDLE:       "idle",
-  CONNECTING: "connecting",
-  GREETING:   "greeting",       // agent speaking greeting
-  LISTENING:  "listening",      // mic open, recording user
-  PROCESSING: "processing",     // STT + LLM + TTS in flight
-  SPEAKING:   "speaking",       // playing agent audio
-  ENDED:      "ended",          // call_ended received
-  ERROR:      "error",
+// ── Sarvam credentials ────────────────────────────────────────────────────────
+const SARVAM_CONFIG = {
+  apiKey:      "sk_samvaad_3qlvxxci_9pOwbe3XBZ9MxmrLBFdRK8Db",
+  orgId:       "01a0b518-16c6-7ae8-b166-25583648e38f",
+  workspaceId: "01a0b518-16ca-79c1-830a-6c4c27bb8786",
+  appId:       "Conversatio-8ca313fa-964a",
+  version:     5,
 };
 
-const STATUS_LABELS = {
-  [STATUS.IDLE]:       "Ready",
-  [STATUS.CONNECTING]: "Connecting…",
-  [STATUS.GREETING]:   "Agent speaking…",
-  [STATUS.LISTENING]:  "🎙 Listening — speak now",
-  [STATUS.PROCESSING]: "Processing…",
-  [STATUS.SPEAKING]:   "Agent speaking…",
-  [STATUS.ENDED]:      "Call ended",
-  [STATUS.ERROR]:      "Error",
+// ── State labels / colours ────────────────────────────────────────────────────
+const STATE_META = {
+  idle:       { label: "Ready",           color: "#475569" },
+  connecting: { label: "Connecting…",     color: "#d97706" },
+  connected:  { label: "Connected",       color: "#0284c7" },
+  listening:  { label: "🎙 Listening",    color: "#16a34a" },
+  speaking:   { label: "Agent speaking…", color: "#2563eb" },
+  error:      { label: "Error",           color: "#dc2626" },
 };
 
 export default function VoiceOrderAgent() {
-  const { user }                        = useAuth();
-  const [callStatus, setCallStatus]     = useState(STATUS.IDLE);
-  const [statusMsg, setStatusMsg]       = useState("");
-  const [placedOrderId, setPlacedOrderId] = useState(null);
-  const [transcript, setTranscript]     = useState([]);  // conversation log
+  const { user } = useAuth();
 
-  const wsRef             = useRef(null);
-  const mediaRecorderRef  = useRef(null);
-  const audioChunksRef    = useRef([]);
-  const audioCtxRef       = useRef(null);
-  const streamRef         = useRef(null);
+  const [callState,    setCallState]    = useState("idle");
+  const [errorMsg,     setErrorMsg]     = useState("");
+  const [isActive,     setIsActive]     = useState(false);
+  const [isMuted,      setIsMuted]      = useState(false);
+  const [transcripts,  setTranscripts]  = useState([]);
+  const [duration,     setDuration]     = useState(0);
 
-  // ── Clean up on unmount ─────────────────────────────────────────────────
+  const agentRef          = useRef(null);
+  const audioInterfaceRef = useRef(null);
+  const timerRef          = useRef(null);
+  const transcriptBoxRef  = useRef(null);
+
+  // ── Call duration timer ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (isActive) {
+      timerRef.current = setInterval(() => {
+        setDuration((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setDuration(0);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isActive]);
+
+  // ── Auto-scroll transcript ────────────────────────────────────────────────
+  useEffect(() => {
+    if (transcriptBoxRef.current) {
+      transcriptBoxRef.current.scrollTop = transcriptBoxRef.current.scrollHeight;
+    }
+  }, [transcripts]);
+
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      wsRef.current?.close();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      agentRef.current?.stop().catch(() => {});
     };
   }, []);
 
-  // ── Play WAV from base64 ─────────────────────────────────────────────────
-  const playAudio = useCallback(async (base64Wav, onEnded) => {
-    const binaryStr = atob(base64Wav);
-    const bytes     = new Uint8Array(binaryStr.length);
-    for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-    const ctx = audioCtxRef.current || new AudioContext();
-    audioCtxRef.current = ctx;
-
-    const audioBuffer = await ctx.decodeAudioData(bytes.buffer);
-    const source      = ctx.createBufferSource();
-    source.buffer     = audioBuffer;
-    source.connect(ctx.destination);
-    source.onended    = onEnded;
-    source.start(0);
-  }, []);
-
-  // ── Start mic recording ──────────────────────────────────────────────────
-  const startRecording = useCallback(async () => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-
-    try {
-      const stream = streamRef.current || await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const recorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current   = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(e.data);
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.start(250);   // send 250 ms chunks
-      setCallStatus(STATUS.LISTENING);
-    } catch (err) {
-      setCallStatus(STATUS.ERROR);
-      setStatusMsg(`Mic error: ${err.message}`);
-    }
-  }, []);
-
-  // ── Stop recording and signal agent ─────────────────────────────────────
-  const stopSpeaking = useCallback(() => {
-    if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") return;
-    mediaRecorderRef.current.stop();
-    setCallStatus(STATUS.PROCESSING);
-
-    setTimeout(() => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: "stop_speaking" }));
-      }
-    }, 300);   // brief delay so final ondataavailable fires first
-  }, []);
-
-  // ── Handle incoming WebSocket messages ──────────────────────────────────
-  const handleWsMessage = useCallback(async (event) => {
-    // Binary → raw audio (shouldn't be sent server→client, but guard anyway)
-    if (event.data instanceof Blob || event.data instanceof ArrayBuffer) return;
-
-    let data;
-    try { data = JSON.parse(event.data); } catch { return; }
-
-    if (data.type === "audio") {
-      setCallStatus(STATUS.SPEAKING);
-      try {
-        await playAudio(data.data, () => {
-          // After agent speaks, auto-start listening
-          if (wsRef.current?.readyState === WebSocket.OPEN) {
-            startRecording();
-          }
-        });
-      } catch {
-        startRecording();   // fallback: start listening even if playback fails
-      }
-    }
-
-    else if (data.type === "call_ended") {
-      setPlacedOrderId(data.order_id);
-      setCallStatus(STATUS.ENDED);
-      setStatusMsg(
-        data.order_id
-          ? `Order #${data.order_id} placed successfully!`
-          : "Call ended. No order was placed."
-      );
-      wsRef.current?.close();
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    }
-
-    else if (data.type === "error") {
-      setStatusMsg(`Agent error: ${data.message}`);
-    }
-  }, [playAudio, startRecording]);
-
-  // ── Start call ───────────────────────────────────────────────────────────
+  // ── Start call ────────────────────────────────────────────────────────────
   const startCall = useCallback(async () => {
     if (!user?.id) {
-      setStatusMsg("Not logged in — cannot start voice order.");
-      setCallStatus(STATUS.ERROR);
+      setErrorMsg("Not logged in — cannot start voice order.");
+      setCallState("error");
       return;
     }
-    setCallStatus(STATUS.CONNECTING);
-    setStatusMsg("");
-    setPlacedOrderId(null);
-    setTranscript([]);
 
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
+    setErrorMsg("");
+    setCallState("connecting");
+    setIsActive(true);
+    setTranscripts([]);
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "session_start", admin_id: user.id }));
-      setCallStatus(STATUS.GREETING);
-    };
+    try {
+      // 1. Initialize browser audio interface (mic capture + playback ring buffer)
+      const audioInterface = new BrowserAudioInterface(16000);
+      audioInterfaceRef.current = audioInterface;
 
-    ws.onmessage  = handleWsMessage;
-    ws.onerror    = () => { setCallStatus(STATUS.ERROR); setStatusMsg("WebSocket connection failed."); };
-    ws.onclose    = () => {
-      if (callStatus !== STATUS.ENDED) setCallStatus(STATUS.IDLE);
-    };
-  }, [user, handleWsMessage, callStatus]);
+      // 2. Configure Sarvam ConversationAgent
+      const agent = new ConversationAgent({
+        apiKey: SARVAM_CONFIG.apiKey,
+        config: {
+          user_identifier_type: "custom",
+          user_identifier:      String(user.id || "admin"),
+          org_id:               SARVAM_CONFIG.orgId,
+          workspace_id:         SARVAM_CONFIG.workspaceId,
+          app_id:               SARVAM_CONFIG.appId,
+          version:              SARVAM_CONFIG.version,
+          interaction_type:     InteractionType.CALL,
+          input_sample_rate:    16000,
+          output_sample_rate:   22050,
+          agent_variables: {
+            admin_id:   String(user.id || "admin"),
+            admin_name: user.name || user.email || "Admin",
+          },
+        },
+        audioInterface,
+        stateCallback: (newState, prev) => {
+          console.log(`[Sarvam Agent] State: ${prev} → ${newState}`);
+          setCallState(newState);
+        },
+        transcriptCallback: async (msg) => {
+          const text = msg?.content || msg?.text || msg?.transcript;
+          if (text) {
+            setTranscripts((prev) => [
+              ...prev.slice(-15),
+              { role: msg.role || "bot", text: String(text) },
+            ]);
+          }
+        },
+        startCallback: async () => {
+          console.log("[Sarvam Agent] Session started");
+          setCallState("connected");
+        },
+        endCallback: async () => {
+          console.log("[Sarvam Agent] Session ended by server");
+          setCallState("idle");
+          setIsActive(false);
+          setIsMuted(false);
+          agentRef.current = null;
+        },
+      });
 
-  // ── End call manually ───────────────────────────────────────────────────
-  const endCall = useCallback(() => {
-    mediaRecorderRef.current?.stop();
-    wsRef.current?.close();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    setCallStatus(STATUS.IDLE);
-    setStatusMsg("");
+      agentRef.current = agent;
+
+      // 3. Connect (fetches signed URL, opens WebSocket, enables mic stream)
+      await agent.start();
+
+      const connected = await agent.waitForConnect(8.0);
+      if (!connected && !agent.isConnected()) {
+        throw new Error("Could not connect to Sarvam voice server in time.");
+      }
+    } catch (err) {
+      console.error("[Sarvam Agent] start failed:", err);
+      const message = err?.message || "Failed to start voice order session.";
+      setErrorMsg(message);
+      setCallState("error");
+      setIsActive(false);
+      agentRef.current = null;
+    }
+  }, [user]);
+
+  // ── End call ──────────────────────────────────────────────────────────────
+  const endCall = useCallback(async () => {
+    try {
+      if (agentRef.current) {
+        await agentRef.current.stop();
+      }
+    } catch (err) {
+      console.warn("[Sarvam Agent] Stop error:", err);
+    } finally {
+      agentRef.current = null;
+      audioInterfaceRef.current = null;
+      setCallState("idle");
+      setIsActive(false);
+      setIsMuted(false);
+      setErrorMsg("");
+    }
   }, []);
 
-  // ── Derived state ────────────────────────────────────────────────────────
-  const isActive   = ![STATUS.IDLE, STATUS.ENDED, STATUS.ERROR].includes(callStatus);
-  const canListen  = callStatus === STATUS.LISTENING;
-  const canSpeak   = callStatus === STATUS.SPEAKING || callStatus === STATUS.GREETING;
+  // ── Mute / Unmute ─────────────────────────────────────────────────────────
+  const toggleMute = useCallback(() => {
+    if (!agentRef.current) return;
+    if (isMuted) {
+      agentRef.current.unmute();
+      setIsMuted(false);
+    } else {
+      agentRef.current.mute();
+      setIsMuted(true);
+    }
+  }, [isMuted]);
+
+  // ── Retry after error ─────────────────────────────────────────────────────
+  const retry = useCallback(() => {
+    setCallState("idle");
+    setErrorMsg("");
+    setIsActive(false);
+    setIsMuted(false);
+  }, []);
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  const meta        = STATE_META[callState] ?? STATE_META.idle;
+  const isListening = callState === "listening";
+  const isSpeaking  = callState === "speaking";
+
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
 
   return (
     <div style={styles.card}>
       {/* ── Header ── */}
       <div style={styles.header}>
-        <span style={styles.title}>🎙 Voice Order Agent</span>
-        <span style={{
-          ...styles.badge,
-          background: callStatus === STATUS.LISTENING  ? "#16a34a" :
-                      callStatus === STATUS.PROCESSING ? "#d97706" :
-                      callStatus === STATUS.ERROR       ? "#dc2626" :
-                      callStatus === STATUS.ENDED       ? "#7c3aed" : "#475569",
-        }}>
-          {STATUS_LABELS[callStatus] ?? callStatus}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span style={styles.title}>🎙 Voice Order Agent</span>
+          {isActive && (
+            <span style={styles.timerBadge}>⏱ {formatTime(duration)}</span>
+          )}
+        </div>
+        <span style={{ ...styles.badge, background: meta.color }}>
+          {meta.label}
         </span>
       </div>
 
-      {/* ── Status message ── */}
-      {statusMsg && (
-        <p style={styles.statusMsg}>{statusMsg}</p>
+      {/* ── Powered-by tag ── */}
+      <p style={styles.poweredBy}>
+        Powered by <strong>Sarvam AI (v5)</strong> · Multilingual Hindi & English
+      </p>
+
+      {/* ── Error message ── */}
+      {errorMsg && (
+        <div style={styles.errorBox}>⚠️ {errorMsg}</div>
       )}
 
-      {/* ── Order placed confirmation ── */}
-      {callStatus === STATUS.ENDED && placedOrderId && (
-        <div style={styles.successBox}>
-          ✅ Order <strong>#{placedOrderId}</strong> placed successfully!
+      {/* ── Visualizer / Status Indicator ── */}
+      {isActive && (
+        <div style={styles.visualizerRow}>
+          {isListening && (
+            <div style={styles.pulseWrap}>
+              <span className="sarvam-pulse-dot" style={styles.pulse} />
+              <span style={styles.pulseLabel}>
+                {isMuted ? "Microphone Muted" : "Listening to you… speak now"}
+              </span>
+            </div>
+          )}
+
+          {isSpeaking && (
+            <div style={styles.waveWrap}>
+              <span style={{ fontSize: "0.8rem", color: "#2563eb", fontWeight: 600, marginRight: 6 }}>
+                Agent speaking:
+              </span>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <span
+                  key={i}
+                  className={`sarvam-wave-bar sarvam-wave-bar-${i}`}
+                  style={styles.waveBar}
+                />
+              ))}
+            </div>
+          )}
+
+          {!isListening && !isSpeaking && callState === "connected" && (
+            <span style={{ fontSize: "0.8rem", color: "#0284c7" }}>
+              Ready · Agent initialized
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Live Transcripts ── */}
+      {transcripts.length > 0 && (
+        <div ref={transcriptBoxRef} style={styles.transcriptBox}>
+          {transcripts.map((t, idx) => {
+            const isUser = t.role === "user";
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  gap: "0.4rem",
+                  fontSize: "0.8rem",
+                  color: isUser ? "#0f172a" : "#1d4ed8",
+                  background: isUser ? "#f1f5f9" : "#eff6ff",
+                  padding: "0.3rem 0.6rem",
+                  borderRadius: 6,
+                  alignSelf: isUser ? "flex-end" : "flex-start",
+                  maxWidth: "92%",
+                }}
+              >
+                <strong>{isUser ? "You:" : "Agent:"}</strong>
+                <span>{t.text}</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* ── Controls ── */}
       <div style={styles.controls}>
-        {!isActive && callStatus !== STATUS.ENDED ? (
+        {!isActive && callState !== "error" && (
           <button
-            id="start-call"
+            id="start-voice-call"
             onClick={startCall}
             style={{ ...styles.btn, ...styles.btnGreen }}
           >
-            🎙 Start Order
+            🎙 Start Order Call
           </button>
-        ) : isActive ? (
+        )}
+
+        {isActive && (
           <>
             <button
-              id="done-speaking"
-              onClick={stopSpeaking}
-              disabled={!canListen}
-              style={{
-                ...styles.btn,
-                ...styles.btnBlue,
-                opacity: canListen ? 1 : 0.45,
-                cursor:  canListen ? "pointer" : "not-allowed",
-              }}
-            >
-              ⏹ Done Speaking
-            </button>
-            <button
+              id="end-voice-call"
               onClick={endCall}
               style={{ ...styles.btn, ...styles.btnRed }}
             >
               ✕ End Call
             </button>
+
+            <button
+              id="mute-voice-call"
+              onClick={toggleMute}
+              style={{
+                ...styles.btn,
+                background: isMuted ? "#fef3c7" : "#f1f5f9",
+                color: isMuted ? "#92400e" : "#334155",
+                border: isMuted ? "1px solid #f59e0b" : "1px solid #cbd5e1",
+              }}
+            >
+              {isMuted ? "🔇 Unmute Mic" : "🎙 Mute Mic"}
+            </button>
           </>
-        ) : (
+        )}
+
+        {callState === "error" && (
           <button
-            onClick={() => { setCallStatus(STATUS.IDLE); setStatusMsg(""); }}
+            id="retry-voice-call"
+            onClick={retry}
             style={{ ...styles.btn, ...styles.btnGray }}
           >
-            ↺ New Call
+            ↺ Try Again
           </button>
         )}
       </div>
 
-      {/* ── Pulse animation when listening ── */}
-      {callStatus === STATUS.LISTENING && (
-        <div style={styles.pulseWrap}>
-          <span style={styles.pulse} />
-          <span style={styles.pulseLabel}>Recording…</span>
-        </div>
-      )}
-
-      {/* ── Inline style for pulse animation ── */}
+      {/* ── Keyframe animations ── */}
       <style>{`
-        @keyframes pulse-ring {
-          0%   { transform: scale(1);   opacity: 0.8; }
+        @keyframes sarvam-pulse {
+          0%   { transform: scale(1);   opacity: 0.9; }
           100% { transform: scale(2.2); opacity: 0; }
         }
-        .pulse-dot { animation: pulse-ring 1.2s ease-out infinite; }
+        .sarvam-pulse-dot { animation: sarvam-pulse 1.2s ease-out infinite; }
+
+        @keyframes sarvam-wave {
+          0%, 100% { height: 6px; }
+          50%      { height: 22px; }
+        }
+        .sarvam-wave-bar   { animation: sarvam-wave 0.85s ease-in-out infinite; }
+        .sarvam-wave-bar-1 { animation-delay: 0.00s; }
+        .sarvam-wave-bar-2 { animation-delay: 0.12s; }
+        .sarvam-wave-bar-3 { animation-delay: 0.24s; }
+        .sarvam-wave-bar-4 { animation-delay: 0.36s; }
+        .sarvam-wave-bar-5 { animation-delay: 0.48s; }
+        .sarvam-wave-bar-6 { animation-delay: 0.60s; }
       `}</style>
     </div>
   );
 }
 
-// ── Inline styles (matches existing dashboard palette) ────────────────────────
+// ── Inline styles ─────────────────────────────────────────────────────────────
 const styles = {
   card: {
-    background:   "var(--card, #fff)",
-    border:       "1px solid var(--border, #e2e8f0)",
-    borderRadius: 12,
-    padding:      "1.25rem 1.5rem",
-    display:      "flex",
-    flexDirection:"column",
-    gap:          "0.75rem",
-    maxWidth:     480,
+    background:    "var(--card, #fff)",
+    border:        "1px solid var(--border, #e2e8f0)",
+    borderRadius:  12,
+    padding:       "1.25rem 1.5rem",
+    display:       "flex",
+    flexDirection: "column",
+    gap:           "0.75rem",
+    maxWidth:      480,
+    boxShadow:     "0 1px 3px rgba(0,0,0,0.06)",
   },
   header: {
     display:        "flex",
@@ -314,60 +397,102 @@ const styles = {
     fontSize:   "1rem",
     color:      "var(--navy, #0f172a)",
   },
+  timerBadge: {
+    fontSize:     "0.75rem",
+    background:   "#f1f5f9",
+    color:        "#475569",
+    padding:      "2px 6px",
+    borderRadius: 4,
+    fontWeight:   600,
+  },
   badge: {
     color:        "#fff",
     borderRadius: 999,
     padding:      "2px 10px",
     fontSize:     "0.75rem",
     fontWeight:   600,
+    transition:   "background 0.3s",
   },
-  statusMsg: {
+  poweredBy: {
     margin:   0,
-    fontSize: "0.8rem",
-    color:    "var(--muted, #64748b)",
+    fontSize: "0.75rem",
+    color:    "var(--muted, #94a3b8)",
   },
-  successBox: {
-    background:   "#f0fdf4",
-    border:       "1px solid #86efac",
+  errorBox: {
+    background:   "#fef2f2",
+    border:       "1px solid #fca5a5",
     borderRadius: 8,
     padding:      "0.5rem 0.85rem",
-    fontSize:     "0.875rem",
-    color:        "#15803d",
+    fontSize:     "0.8rem",
+    color:        "#b91c1c",
+  },
+  visualizerRow: {
+    padding:       "0.5rem 0.75rem",
+    background:    "#f8fafc",
+    borderRadius:  8,
+    border:        "1px solid #e2e8f0",
+    display:       "flex",
+    alignItems:    "center",
+    minHeight:     36,
+  },
+  pulseWrap: {
+    display:    "flex",
+    alignItems: "center",
+    gap:        "0.6rem",
+  },
+  pulse: {
+    display:      "inline-block",
+    width:        10,
+    height:       10,
+    borderRadius: "50%",
+    background:   "#16a34a",
+  },
+  pulseLabel: {
+    fontSize:   "0.8rem",
+    color:      "#16a34a",
+    fontWeight: 600,
+  },
+  waveWrap: {
+    display:    "flex",
+    alignItems: "center",
+    gap:        4,
+    height:     24,
+  },
+  waveBar: {
+    display:         "inline-block",
+    width:           4,
+    height:          12,
+    borderRadius:    4,
+    background:      "#2563eb",
+    transformOrigin: "center",
+  },
+  transcriptBox: {
+    maxHeight:     140,
+    overflowY:     "auto",
+    display:       "flex",
+    flexDirection: "column",
+    gap:           "0.4rem",
+    padding:       "0.5rem",
+    background:    "#fafafa",
+    borderRadius:  8,
+    border:        "1px solid #e5e7eb",
   },
   controls: {
-    display: "flex",
-    gap:     "0.5rem",
-    flexWrap:"wrap",
+    display:  "flex",
+    gap:      "0.5rem",
+    flexWrap: "wrap",
+    marginTop: "0.25rem",
   },
   btn: {
     border:       "none",
     borderRadius: 8,
-    padding:      "0.5rem 1.1rem",
+    padding:      "0.55rem 1.15rem",
     fontWeight:   600,
     fontSize:     "0.875rem",
     cursor:       "pointer",
-    transition:   "opacity 0.15s",
+    transition:   "opacity 0.15s, transform 0.05s",
   },
   btnGreen: { background: "#16a34a", color: "#fff" },
-  btnBlue:  { background: "#2563eb", color: "#fff" },
   btnRed:   { background: "#dc2626", color: "#fff" },
   btnGray:  { background: "#475569", color: "#fff" },
-  pulseWrap: {
-    display:    "flex",
-    alignItems: "center",
-    gap:        "0.5rem",
-  },
-  pulse: {
-    display:     "inline-block",
-    width:       10,
-    height:      10,
-    borderRadius:"50%",
-    background:  "#16a34a",
-    className:   "pulse-dot",   // applied via <style> above
-  },
-  pulseLabel: {
-    fontSize: "0.8rem",
-    color:    "#16a34a",
-    fontWeight: 600,
-  },
 };
